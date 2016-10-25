@@ -1,14 +1,22 @@
 package gfm
 
+import (
+	"bytes"
+	"encoding/xml"
+	"fmt"
+	"net/http"
+)
+
 // Database is the interface of a FileMaker database
 type Database interface {
 	Server() Server
 	Name() string
 	Lay(string) Layout
-	Lays() []Layout
+	Lays() ([]Layout, error)
 	// TODO: Find out if this is the proper way of representing script. Maybe
 	// they need their own type?
 	Scripts() []string
+	URL() string
 }
 
 type database struct {
@@ -28,14 +36,47 @@ func (db database) Lay(name string) Layout {
 	return layout{database: db, name: name}
 }
 
-func (db database) Lays() []Layout {
+func (db database) Lays() ([]Layout, error) {
 	var lays []Layout
-	// TODO: implement this using –layoutnames
-	return lays
+
+	var b bytes.Buffer
+	b.WriteString(db.URL())
+	b.WriteString("-layoutnames")
+	res, err := http.Get(b.String())
+
+	if err != nil {
+		// TODO: maybe we need a better error here
+		return lays, err
+	}
+
+	var fmrs FMResultSet
+	err = xml.NewDecoder(res.Body).Decode(&fmrs)
+	if err != nil {
+		return lays, err
+	} else if fmrs.Error.Code != 0 {
+		return lays, fmt.Errorf("FMError: %v", fmrs.Error.Code)
+	}
+
+	for _, r := range fmrs.ResultSet.Records {
+		name := r.Fields[0].Data
+		lay := layout{database: db, name: name}
+		lays = append(lays, lay)
+	}
+
+	return lays, nil
 }
 
 func (db database) Scripts() []string {
 	var scripts []string
 	// TODO: implement this using
 	return scripts
+}
+
+func (db database) URL() string {
+	var b bytes.Buffer
+	b.WriteString(db.Server().URL())
+	b.WriteString("-db=")
+	b.WriteString(db.Name())
+	b.WriteString("&")
+	return b.String()
 }
