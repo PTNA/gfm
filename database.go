@@ -9,13 +9,25 @@ import (
 
 // Database is the interface of a FileMaker database
 type Database interface {
+	// Server returns the Server that this database belongs to.
 	Server() Server
+
+	// Name returns the name of the database.
 	Name() string
+
+	// Lay returns a Layout struct, which can be queried further.
 	Lay(string) Layout
+
+	// Lays returns the layouts of the database.
 	Lays() ([]Layout, error)
+
+	// Scripts returns an array of the scripts on this database.
+	//
 	// TODO: Find out if this is the proper way of representing script. Maybe
 	// they need their own type?
 	Scripts() ([]string, error)
+
+	// URL returns the url for sending requests to this database.
 	URL() string
 }
 
