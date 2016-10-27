@@ -15,7 +15,7 @@ type Database interface {
 	Lays() ([]Layout, error)
 	// TODO: Find out if this is the proper way of representing script. Maybe
 	// they need their own type?
-	Scripts() []string
+	Scripts() ([]string, error)
 	URL() string
 }
 
@@ -66,10 +66,32 @@ func (db database) Lays() ([]Layout, error) {
 	return lays, nil
 }
 
-func (db database) Scripts() []string {
+func (db database) Scripts() ([]string, error) {
 	var scripts []string
-	// TODO: implement this using
-	return scripts
+
+	var b bytes.Buffer
+	b.WriteString(db.URL())
+	b.WriteString("-scriptnames")
+	res, err := http.Get(b.String())
+
+	if err != nil {
+		// TODO: maybe we need a better error here
+		return scripts, err
+	}
+	var fmrs FMResultSet
+	err = xml.NewDecoder(res.Body).Decode(&fmrs)
+	if err != nil {
+		return scripts, err
+	} else if fmrs.Error.Code != 0 {
+		return scripts, fmt.Errorf("FMError: %v", fmrs.Error.Code)
+	}
+
+	for _, r := range fmrs.ResultSet.Records {
+		name := r.Fields[0].Data
+		scripts = append(scripts, name)
+	}
+
+	return scripts, nil
 }
 
 func (db database) URL() string {
